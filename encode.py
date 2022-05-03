@@ -4,34 +4,12 @@ import numpy as np
 import sys
 np.set_printoptions(threshold=sys.maxsize)
 
-img = Image.open('imgs/testcard.png')
-
-IMG_WIDTH = img.width
-IMG_HEIGHT = img.height
-CHANNELS = len(img.mode)
-
-img = np.uintc(img).flatten()
+QOI_HEADER_SIZE = 14
+QOI_END_MARKER = [0, 0, 0, 0, 0, 0, 0, 1]
+QOI_END_MARKER_SIZE = len(QOI_END_MARKER)
 
 def indexPosition(r, g, b, a):
     return (r * 3 + g * 5 + b * 7 + a * 11) % 64
-
-def QOI_OP_RGB():
-    return
-
-def QOI_OP_RGBA():
-    return
-
-def QOI_OP_INDEX():
-    return
-
-def QOI_OP_DIFF():
-    return
-
-def QOI_OP_LUMA():
-    return
-
-def QOI_OP_RUN():
-    return
 
 class color:
   def __init__(self, r, g, b, a):
@@ -41,7 +19,17 @@ class color:
     self.a = a
 
 def main():
-    seenPixels = np.full(64, color(0, 0, 0, 0))
-    previousPixel = color(0, 0, 0, 0)
+    img = Image.open('imgs/kodim10.png')
+    IMG_WIDTH = img.width
+    IMG_HEIGHT = img.height
+    CHANNELS = len(img.mode)
+    img = np.uint8(img).flatten()
 
-main()
+    seenPixels = np.full(64, color(0, 0, 0, 0))
+    previousPixel = color(0, 0, 0, 255)
+    maxSize = IMG_WIDTH * IMG_HEIGHT * (CHANNELS + 1) + QOI_HEADER_SIZE + QOI_END_MARKER_SIZE
+    byteStream = np.uint8(np.zeros(maxSize)) # Worst case encoding
+    
+    print(img)
+
+# main()
