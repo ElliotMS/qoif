@@ -5,7 +5,7 @@ import numpy as np
 import sys
 np.set_printoptions(threshold=sys.maxsize)
 
-MAGIC = 0x716F6966 # "qoif" in hexadecimal
+MAGIC = 0x716F6966 # "qoif" joined in hexadecimal
 QOI_HEADER_SIZE = 14
 QOI_END_MARKER = np.uint8([0, 0, 0, 0, 0, 0, 0, 1])
 QOI_END_MARKER_SIZE = len(QOI_END_MARKER)
@@ -49,8 +49,8 @@ class color:
     self.b = b
     self.a = a
 
-def encode():
-  img = Image.open('imgs/testcard.png')
+def encode(image):
+  img = Image.open(image)
   IMG_WIDTH = img.width
   IMG_HEIGHT = img.height
   CHANNELS = len(img.mode)
@@ -96,7 +96,7 @@ def encode():
         # print(format(byteStream[index], '#010b'))
         index += 1
         run = 0
-        continue
+      continue
     else: 
       if run > 0:
         byteStream[index] = QOI_OP_RUN | run-1
@@ -146,12 +146,12 @@ def encode():
   index += 8
   return byteStream[0:index]
 
-test = encode()
-print(len(test))
-img = Image.open('imgs/testcard.png')
+img_path = 'imgs/testcard_rgba.png'
+qoi = encode(img_path)
+img = Image.open(img_path)
 imgData = np.uint8(img).flatten()
+
+print(len(qoi))
 print(len(imgData))
-print(test[:50])
+print(qoi[:50])
 print(imgData[:50])
-# def decode(qoi):
-  # return image
