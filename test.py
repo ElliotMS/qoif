@@ -17,23 +17,12 @@ class color:
     self.b = b
     self.a = a
 
-def difference(color1, color2):
-  return color(
-    int(color1.r)-int(color2.r),
-    int(color1.g)-int(color2.g),
-    int(color1.b)-int(color2.b),
-    int(color1.a)-int(color2.a),
-  )
+def hashPosition(color):
+  return (color.r * 3 + color.g * 5 + color.b * 7 + color.a * 11) % 64
 
-diff = difference(color(10, 1, 12, 255), color(9, 2, 14, 255))
-if -2 <= diff.r <= 1 and -2 <= diff.g <= 1 and -2 <= diff.b <= 1:
-    print(diff.r)
-    print(diff.g)
-    print(diff.b)
-    print(diff.a)
-    
-# test = -3
-# if -2 <= test <= 1:
-#     print("test")
+pixel = color(255, 255, 0, 255)
 
-# print(np.uint8(-2))
+hashPos = hashPosition(pixel)
+
+print(pixel = 
+  

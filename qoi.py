@@ -58,6 +58,7 @@ def encode(image):
 
   seenPixels = np.full(64, color(0, 0, 0, 0))
   prevPixel = color(0, 0, 0, 255)
+  pixel = prevPixel
   maxSize = IMG_WIDTH * IMG_HEIGHT * (CHANNELS + 1) + QOI_HEADER_SIZE + QOI_END_MARKER_SIZE # Worst case encoding
   byteStream = np.uint8(np.zeros(maxSize))
   run = 0
@@ -72,7 +73,6 @@ def encode(image):
   index += 1 
   byteStream[index] = 1 # All channels linear
   index += 1 
-  pixel = prevPixel
 
   for i in range(0, len(imgData), CHANNELS):
     prevPixel = pixel
@@ -91,24 +91,21 @@ def encode(image):
     # Run-length operation
     if isEqual(prevPixel, pixel):
       run += 1
-      if run == 62 or i == len(imgData):
+      if run == 62 or i == len(imgData) - CHANNELS:
         byteStream[index] = QOI_OP_RUN | run-1
-        # print(format(byteStream[index], '#010b'))
         index += 1
         run = 0
       continue
     else: 
       if run > 0:
         byteStream[index] = QOI_OP_RUN | run-1
-        # print(format(byteStream[index], '#010b'))
         index += 1
         run = 0
 
     # Index operation
     hashPos = hashPosition(pixel)
-    if pixel == seenPixels[hashPos]:
+    if isEqual(pixel, seenPixels[hashPos]):
       byteStream[index] = QOI_OP_INDEX | hashPos
-      # print(format(byteStream[index], '#010b'))
       index += 1
       continue
     else:
@@ -119,7 +116,6 @@ def encode(image):
     if diff.a == 0:
       if -2 <= diff.r <= 1 and -2 <= diff.g <= 1 and -2 <= diff.b <= 1:
         byteStream[index] = QOI_OP_DIFF | (diff.r + 2) << 4 | (diff.g + 2) << 2 | (diff.b + 2) << 0
-        # print(format(byteStream[index], '#010b'))
         index += 1
         continue
       if -32 <= diff.g <= 31:
@@ -133,12 +129,10 @@ def encode(image):
     # Full RGB(A) operation
     if CHANNELS == 3:
       byteStream[index:index+4] = [QOI_OP_RGB, pixel.r, pixel.g, pixel.b]
-      # print(byteStream[index:index+4])
       index += 4
       continue
     elif CHANNELS == 4:
       byteStream[index:index+5] = [QOI_OP_RGBA, pixel.r, pixel.g, pixel.b, pixel.a]
-      # print(byteStream[index:index+5])
       index += 5
       continue
 
@@ -146,12 +140,19 @@ def encode(image):
   index += 8
   return byteStream[0:index]
 
-img_path = 'imgs/testcard_rgba.png'
-qoi = encode(img_path)
-img = Image.open(img_path)
-imgData = np.uint8(img).flatten()
+def decode(qoi_path):
+  qoi = open(qoi_path, "rb").read()
+  IMG_WIDTH = qoi[4:8]
+  IMG_HEIGHT = qoi[8:12]
+  print(IMG_WIDTH)
+  print(IMG_HEIGHT)
 
-print(len(qoi))
-print(len(imgData))
-print(qoi[:50])
-print(imgData[:50])
+def writeFile(data):
+  f = open("image.qoi", "wb")
+  f.write(data)
+  f.close()
+
+# img_path = 'imgs/kodim23.png'
+# qoi = encode(img_path)
+# writeFile(qoi)
+decode("image.qoi")
