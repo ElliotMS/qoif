@@ -23,6 +23,7 @@ def isEqual(color1, color2):
   return color1.r == color2.r and color1.g == color2.g and color1.b == color2.b and color1.a == color2.a
 
 def difference(color1, color2):
+  # ADD WRAP-AROUND OP?
   return color(
     int(color1.r)-int(color2.r),
     int(color1.g)-int(color2.g),
@@ -49,7 +50,7 @@ class color:
     self.a = a
 
 def encode():
-  img = Image.open('imgs/kodim23.png')
+  img = Image.open('imgs/testcard.png')
   IMG_WIDTH = img.width
   IMG_HEIGHT = img.height
   CHANNELS = len(img.mode)
@@ -73,9 +74,9 @@ def encode():
   index += 1 
   pixel = prevPixel
 
-  for i in range(0, 100, CHANNELS):
+  for i in range(0, len(imgData), CHANNELS):
     prevPixel = pixel
-    print("\n")
+    # print("\n")
 
     pixel = color(
       imgData[i + 0],
@@ -92,46 +93,52 @@ def encode():
       run += 1
       if run == 62 or i == len(imgData):
         byteStream[index] = QOI_OP_RUN | run-1
-        print(format(byteStream[index], '#010b'))
+        # print(format(byteStream[index], '#010b'))
         index += 1
         run = 0
         continue
     else: 
       if run > 0:
         byteStream[index] = QOI_OP_RUN | run-1
-        print(format(byteStream[index], '#010b'))
+        # print(format(byteStream[index], '#010b'))
         index += 1
         run = 0
-        continue
 
     # Index operation
     hashPos = hashPosition(pixel)
     if pixel == seenPixels[hashPos]:
       byteStream[index] = QOI_OP_INDEX | hashPos
-      print(format(byteStream[index], '#010b'))
+      # print(format(byteStream[index], '#010b'))
       index += 1
       continue
     else:
       seenPixels[hashPos] = pixel
 
-    # Difference operation
+    # Difference operation & Luma difference operation
     diff = difference(pixel, prevPixel)
     if diff.a == 0:
-      if diff.r >=-2 and diff.r <= 1 and diff.g >=-2 and diff.g <= 1 and diff.b >=-2 and diff.b <= 1:
+      if -2 <= diff.r <= 1 and -2 <= diff.g <= 1 and -2 <= diff.b <= 1:
         byteStream[index] = QOI_OP_DIFF | (diff.r + 2) << 4 | (diff.g + 2) << 2 | (diff.b + 2) << 0
-        print(format(byteStream[index], '#010b'))
+        # print(format(byteStream[index], '#010b'))
         index += 1
         continue
+      if -32 <= diff.g <= 31:
+        dr = diff.r - diff.g
+        db = diff.b - diff.g
+        if -8 <= dr <= 7 and -8 <= db <= 7:
+          byteStream[index:index+2] = [QOI_OP_LUMA | (diff.g + 32), (dr + 8) << 4| (db + 8) << 0]
+          index += 2
+          continue
 
     # Full RGB(A) operation
     if CHANNELS == 3:
-      byteStream[index:index+4] = [QOI_OP_RGB, pixel.r, pixel.g, pixel.g]
-      print(byteStream[index:index+4])
+      byteStream[index:index+4] = [QOI_OP_RGB, pixel.r, pixel.g, pixel.b]
+      # print(byteStream[index:index+4])
       index += 4
       continue
     elif CHANNELS == 4:
-      byteStream[index:index+5] = [QOI_OP_RGBA, pixel.r, pixel.g, pixel.g, pixel.a]
-      print(byteStream[index:index+5])
+      byteStream[index:index+5] = [QOI_OP_RGBA, pixel.r, pixel.g, pixel.b, pixel.a]
+      # print(byteStream[index:index+5])
       index += 5
       continue
 
@@ -140,10 +147,11 @@ def encode():
   return byteStream[0:index]
 
 test = encode()
-print(test[0:100])
-img = Image.open('imgs/kodim10.png')
-imgData = imgData = np.uint8(img).flatten()
-print(imgData[0:100])
-
+print(len(test))
+img = Image.open('imgs/testcard.png')
+imgData = np.uint8(img).flatten()
+print(len(imgData))
+print(test[:50])
+print(imgData[:50])
 # def decode(qoi):
   # return image
