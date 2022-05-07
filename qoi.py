@@ -5,8 +5,9 @@ import numpy as np
 import sys
 np.set_printoptions(threshold=sys.maxsize)
 
-MAGIC = 0x716F6966 # "qoif" joined in hexadecimal
-QOI_HEADER_SIZE = 14
+# Declare constant variables
+MAGIC = 0x716F6966 # "qoif" in hexadecimal
+QOI_HEADER_SIZE = 14 
 QOI_END_MARKER = np.uint8([0, 0, 0, 0, 0, 0, 0, 1])
 QOI_END_MARKER_SIZE = len(QOI_END_MARKER)
 QOI_OP_INDEX  = 0x00 # 00xxxxxx 
@@ -23,7 +24,6 @@ def isEqual(color1, color2):
   return color1.r == color2.r and color1.g == color2.g and color1.b == color2.b and color1.a == color2.a
 
 def difference(color1, color2):
-  # ADD WRAP-AROUND OP?
   return color(
     int(color1.r)-int(color2.r),
     int(color1.g)-int(color2.g),
@@ -76,7 +76,6 @@ def encode(image):
 
   for i in range(0, len(imgData), CHANNELS):
     prevPixel = pixel
-    # print("\n")
 
     pixel = color(
       imgData[i + 0],
@@ -140,19 +139,32 @@ def encode(image):
   index += 8
   return byteStream[0:index]
 
-def decode(qoi_path):
-  qoi = open(qoi_path, "rb").read()
-  IMG_WIDTH = qoi[4:8]
-  IMG_HEIGHT = qoi[8:12]
-  print(IMG_WIDTH)
-  print(IMG_HEIGHT)
-
 def writeFile(data):
   f = open("image.qoi", "wb")
   f.write(data)
   f.close()
 
-# img_path = 'imgs/kodim23.png'
-# qoi = encode(img_path)
-# writeFile(qoi)
-decode("image.qoi")
+def decode(qoi_path):
+  qoi = open(qoi_path, "rb").read()
+  MAGIC = qoi[0:4]
+  IMG_WIDTH = qoi[4:8]
+  IMG_HEIGHT = qoi[8:12]
+  CHANNELS = qoi[12]
+
+  print(f'Magic:     {MAGIC}')
+  print(f'Width:     {int.from_bytes(IMG_WIDTH, "big")}')
+  print(f'Height:    {int.from_bytes(IMG_HEIGHT, "big")}')
+  print(f'Channels:  {CHANNELS}')
+
+  # for i in range(14, len(qoi)):
+  #   print("")
+
+def main():
+  # img_path = 'imgs/kodim23.png'
+  # qoi = encode(img_path)
+  # writeFile(qoi)
+  decode("image.qoi")
+
+
+if __name__ == "__main__":
+  main()
