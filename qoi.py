@@ -5,7 +5,7 @@ import sys
 np.set_printoptions(threshold=sys.maxsize)
 
 # Declare constant variables
-MAGIC = 0x716F6966 # "qoif" in hexadecimal
+QOI_MAGIC = 0x716F6966 # "qoif" in hexadecimal
 QOI_HEADER_SIZE = 14 
 QOI_END_MARKER = np.uint8([0, 0, 0, 0, 0, 0, 0, 1])
 QOI_END_MARKER_SIZE = len(QOI_END_MARKER)
@@ -32,14 +32,38 @@ def difference(color1, color2):
 
 def write32(bytes, value):
   global index
-  bytes[index] = (value & 0xff000000) >> 24 
+  bytes[index+0] = (value & 0xff000000) >> 24 
+  bytes[index+1] = (value & 0x00ff0000) >> 16 
+  bytes[index+2] = (value & 0x0000ff00) >> 8 
+  bytes[index+3] = (value & 0x000000ff) >> 0 
+  index+=4
+
+def write8(bytes, value):
+  global index
+  bytes[index] = value
   index+=1
-  bytes[index] = (value & 0x00ff0000) >> 16 
-  index+=1
-  bytes[index] = (value & 0x0000ff00) >> 8 
-  index+=1
-  bytes[index] = (value & 0x000000ff) >> 0 
-  index+=1
+
+def read32(bytes):
+  global readIndex
+  a = (bytes[readIndex+0])
+  b = (bytes[readIndex+1])
+  c = (bytes[readIndex+2])
+  d = (bytes[readIndex+3])
+  readIndex+=4
+  return a << 24 | b << 16 | c << 8 | d
+
+def read8(bytes):
+  global readIndex
+  a = bytes[readIndex]
+  readIndex += 1
+  return a
+
+def writePixel(pixels, color, index, CHANNELS):
+  pixels[index+0] = color.r
+  pixels[index+1] = color.g
+  pixels[index+2] = color.b
+  if CHANNELS == 4:
+    pixels[index+3] = color.a
 
 class color:
   def __init__(self, r, g, b, a):
@@ -65,13 +89,11 @@ def encode(image):
   index = 0
 
   # Write header
-  write32(byteStream, MAGIC)
+  write32(byteStream, QOI_MAGIC)
   write32(byteStream, IMG_WIDTH)
   write32(byteStream, IMG_HEIGHT)
-  byteStream[index] = CHANNELS
-  index += 1 
-  byteStream[index] = 1 # All channels linear
-  index += 1 
+  write8(byteStream, CHANNELS)
+  write8(byteStream, 1) # All channels linear
 
   for i in range(0, len(imgData), CHANNELS):
     prevPixel = pixel
@@ -138,124 +160,90 @@ def encode(image):
   index += 8
   return byteStream[0:index]
 
-def writeFile(data):
-  f = open("image.qoi", "wb")
+def writeFile(data, fileName):
+  f = open(fileName, "wb")
   f.write(data)
   f.close()
 
 def decode(qoi_path):
   qoi = open(qoi_path, "rb").read()
-  MAGIC = qoi[0:4]
-  IMG_WIDTH = int.from_bytes(qoi[4:8], "big")
-  IMG_HEIGHT = int.from_bytes(qoi[8:12], "big")
-  CHANNELS = qoi[12]
+ 
+  global readIndex
+  readIndex = 0
+  
+  # Read header
+  MAGIC       = read32(qoi)
+  IMG_WIDTH   = read32(qoi)
+  IMG_HEIGHT  = read32(qoi)
+  CHANNELS    = read8(qoi)
+  COLORSPACE  = read8(qoi)
 
-  if MAGIC != b'qoif':
-    print(f'{qoi_path} is not a .qoi image.')
-    return 
+  print(f'MAGIC:      {MAGIC}')
+  print(f'WIDTH:      {IMG_WIDTH}')
+  print(f'HEIGHT:     {IMG_HEIGHT}')
+  print(f'CHANNELS:   {CHANNELS}')
+
+  if MAGIC != QOI_MAGIC or 3 > CHANNELS > 4 or IMG_WIDTH == 0 or IMG_HEIGHT == 0:
+    raise Exception("Invalid .qoi file")
 
   seenPixels = np.full(64, color(0, 0, 0, 0))
-  size = IMG_WIDTH * IMG_HEIGHT
-  pixels = np.uint8(np.zeros(shape=(size, CHANNELS)))
-  index = 14
-  px_pos = 0
+  size = IMG_WIDTH * IMG_HEIGHT * CHANNELS
+  pixels = np.uint8(np.zeros(size))
+  pixel = color(0, 0, 0, 255)
   run = 0
 
-  while True:
-    byteTag = qoi[index]        # 8bit tag
-    bitTag = qoi[index] & 0xc0  # 2bit tag
-
-    # Check for end tag
-    # if (np.frombuffer(qoi[index:index+QOI_END_MARKER_SIZE], dtype=np.uint8) == QOI_END_MARKER).all():
-    #   break
-    if px_pos == size:
-      break
-    
-    if byteTag == QOI_OP_RGB:
-      pixel = color(qoi[index+1], qoi[index+2], qoi[index+3], 255)
-      index += 4
-
-    elif byteTag == QOI_OP_RGBA:
-      pixel = color(qoi[index+1], qoi[index+2], qoi[index+3], qoi[index+4])
-      index += 5
-
-    elif bitTag == QOI_OP_RUN:
-      run = (qoi[index] & 0x3f) + 1
-      if px_pos == 0:
-        pixel = color(0, 0, 0, 255)
-      elif CHANNELS == 3:
-        pixel = color(
-          pixels[px_pos-1][0],
-          pixels[px_pos-1][1],
-          pixels[px_pos-1][2],
-          255)   
-      elif CHANNELS == 4:
-        pixel = color(
-          pixels[px_pos-1][0],
-          pixels[px_pos-1][1],
-          pixels[px_pos-1][2],
-          pixels[px_pos-1][3]
-          )
-      index += 1
-
-    elif bitTag == QOI_OP_INDEX:
-      hashPos = qoi[index] & 0x3F
-      pixel = seenPixels[hashPos]
-      index += 1
-
-    elif bitTag == QOI_OP_DIFF:
-      dr, dg, db = qoi[index] & 0x30, qoi[index] & 0x0c, qoi[index] & 0x03
-      r, g, b = pixels[px_pos-1][0] + dr, pixels[px_pos-1][1] + dg, pixels[px_pos-1][2] + db
-      if CHANNELS == 4:
-        a = pixels[px_pos][3]
-      else:
-        a = 255
-      pixel = color(r, g, b, a)
-      index += 1
-      
-    elif bitTag == QOI_OP_LUMA:
-      # dg = qoi[index] & 0x3f - 32
-      # dr_dg = ((qoi[index + 1] & 0xF0) >> 4) - 8
-      # db_dg = (qoi[index + 1] & 0x0F) - 8
-      # r = pixels[-1][0] - dg
-      # g = 0
-      # b = 0
-      # if CHANNELS == 4:
-      #   a = pixels[px_pos-1][3]
-      # else:
-      #   a = 255
-      # pixel = color(r, g, b, a)
-      pixel = color(0, 0, 0, 255)
-      index += 2
-
-    r, g, b, a = pixel.r, pixel.g, pixel.b, pixel.a 
+  for writeIndex in range(0, size, CHANNELS):
     if run > 0:
-      while run > 0:
-        pixels[px_pos][0] = r
-        pixels[px_pos][1] = g
-        pixels[px_pos][2] = b
-        if CHANNELS == 4:
-          pixels[px_pos][3] = a 
-        px_pos += 1
-        run -= 1
+      run -= 1
+    else:
+      byte = read8(qoi)
 
-    pixels[px_pos][0] = r 
-    pixels[px_pos][1] = g
-    pixels[px_pos][2] = b
-    if CHANNELS == 4:
-      pixels[px_pos][3] = a 
+      if byte == QOI_OP_RGB:
+        pixel.r = read8(qoi)
+        pixel.g = read8(qoi)
+        pixel.b = read8(qoi)
+      
+      elif byte == QOI_OP_RGBA:
+        pixel.r = read8(qoi)
+        pixel.g = read8(qoi)
+        pixel.b = read8(qoi)
+        pixel.a = read8(qoi)
 
-    seenPixels[hashPosition(pixel)] = pixel
-    px_pos += 1
-    
+      elif byte & 0xc0 == QOI_OP_RUN:
+        run = byte & 0x3f
+
+      elif byte & 0xc0 == QOI_OP_INDEX:
+        pixel = seenPixels[byte & 0x3f]
+
+      elif byte & 0xc0 == QOI_OP_DIFF:
+        dr = ((byte >> 4) & 0x03) - 2
+        dg = ((byte >> 2) & 0x03) - 2
+        db = ((byte >> 0) & 0x03) - 2
+        pixel.r += dr 
+        pixel.g += dg
+        pixel.b += db
+
+      elif byte & 0xc0 == QOI_OP_LUMA:
+        byte2 = read8(qoi)
+        dg = (byte & 0x3f) - 32
+        dr_dg = ((byte2 >> 4) & 0x0f) - 8
+        db_dg = ((byte2 >> 0) & 0x0f) - 8
+        pixel.r += dg + dr_dg
+        pixel.g += dg
+        pixel.b += dg + db_dg
+
+      seenPixels[hashPosition(pixel)] = pixel
+    writePixel(pixels, pixel, writeIndex, CHANNELS)
+  
   return pixels.reshape(IMG_HEIGHT, IMG_WIDTH, CHANNELS)  
 
 def main():
-  # img_path = 'imgs/kodim23.png'
+  # img_path = 'imgs/kodim10.png'
   # qoi = encode(img_path)
-  # writeFile(qoi)
+  # writeFile(qoi, "encodedImage")
   data = decode("imgs/kodim10.qoi")
   img = Image.fromarray(data, 'RGB')
+  img.save("decodedImage.png")
   img.show()
 
 if __name__ == "__main__":
