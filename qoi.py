@@ -1,6 +1,5 @@
 # Import modules
 from PIL import Image
-from PIL.ExifTags import TAGS
 import numpy as np
 import sys
 np.set_printoptions(threshold=sys.maxsize)
@@ -147,24 +146,117 @@ def writeFile(data):
 def decode(qoi_path):
   qoi = open(qoi_path, "rb").read()
   MAGIC = qoi[0:4]
-  IMG_WIDTH = qoi[4:8]
-  IMG_HEIGHT = qoi[8:12]
+  IMG_WIDTH = int.from_bytes(qoi[4:8], "big")
+  IMG_HEIGHT = int.from_bytes(qoi[8:12], "big")
   CHANNELS = qoi[12]
 
-  print(f'Magic:     {MAGIC}')
-  print(f'Width:     {int.from_bytes(IMG_WIDTH, "big")}')
-  print(f'Height:    {int.from_bytes(IMG_HEIGHT, "big")}')
-  print(f'Channels:  {CHANNELS}')
+  if MAGIC != b'qoif':
+    print(f'{qoi_path} is not a .qoi image.')
+    return 
 
-  # for i in range(14, len(qoi)):
-  #   print("")
+  seenPixels = np.full(64, color(0, 0, 0, 0))
+  size = IMG_WIDTH * IMG_HEIGHT
+  pixels = np.uint8(np.zeros(shape=(size, CHANNELS)))
+  index = 14
+  px_pos = 0
+  run = 0
+
+  while True:
+    byteTag = qoi[index]        # 8bit tag
+    bitTag = qoi[index] & 0xc0  # 2bit tag
+
+    # Check for end tag
+    # if (np.frombuffer(qoi[index:index+QOI_END_MARKER_SIZE], dtype=np.uint8) == QOI_END_MARKER).all():
+    #   break
+    if px_pos == size:
+      break
+    
+    if byteTag == QOI_OP_RGB:
+      pixel = color(qoi[index+1], qoi[index+2], qoi[index+3], 255)
+      index += 4
+
+    elif byteTag == QOI_OP_RGBA:
+      pixel = color(qoi[index+1], qoi[index+2], qoi[index+3], qoi[index+4])
+      index += 5
+
+    elif bitTag == QOI_OP_RUN:
+      run = (qoi[index] & 0x3f) + 1
+      if px_pos == 0:
+        pixel = color(0, 0, 0, 255)
+      elif CHANNELS == 3:
+        pixel = color(
+          pixels[px_pos-1][0],
+          pixels[px_pos-1][1],
+          pixels[px_pos-1][2],
+          255)   
+      elif CHANNELS == 4:
+        pixel = color(
+          pixels[px_pos-1][0],
+          pixels[px_pos-1][1],
+          pixels[px_pos-1][2],
+          pixels[px_pos-1][3]
+          )
+      index += 1
+
+    elif bitTag == QOI_OP_INDEX:
+      hashPos = qoi[index] & 0x3F
+      pixel = seenPixels[hashPos]
+      index += 1
+
+    elif bitTag == QOI_OP_DIFF:
+      dr, dg, db = qoi[index] & 0x30, qoi[index] & 0x0c, qoi[index] & 0x03
+      r, g, b = pixels[px_pos-1][0] + dr, pixels[px_pos-1][1] + dg, pixels[px_pos-1][2] + db
+      if CHANNELS == 4:
+        a = pixels[px_pos][3]
+      else:
+        a = 255
+      pixel = color(r, g, b, a)
+      index += 1
+      
+    elif bitTag == QOI_OP_LUMA:
+      # dg = qoi[index] & 0x3f - 32
+      # dr_dg = ((qoi[index + 1] & 0xF0) >> 4) - 8
+      # db_dg = (qoi[index + 1] & 0x0F) - 8
+      # r = pixels[-1][0] - dg
+      # g = 0
+      # b = 0
+      # if CHANNELS == 4:
+      #   a = pixels[px_pos-1][3]
+      # else:
+      #   a = 255
+      # pixel = color(r, g, b, a)
+      pixel = color(0, 0, 0, 255)
+      index += 2
+
+    r, g, b, a = pixel.r, pixel.g, pixel.b, pixel.a 
+    if run > 0:
+      while run > 0:
+        pixels[px_pos][0] = r
+        pixels[px_pos][1] = g
+        pixels[px_pos][2] = b
+        if CHANNELS == 4:
+          pixels[px_pos][3] = a 
+        px_pos += 1
+        run -= 1
+
+    pixels[px_pos][0] = r 
+    pixels[px_pos][1] = g
+    pixels[px_pos][2] = b
+    if CHANNELS == 4:
+      pixels[px_pos][3] = a 
+
+    seenPixels[hashPosition(pixel)] = pixel
+    px_pos += 1
+    
+  return pixels.reshape(IMG_HEIGHT, IMG_WIDTH, CHANNELS)  
 
 def main():
   # img_path = 'imgs/kodim23.png'
   # qoi = encode(img_path)
   # writeFile(qoi)
-  decode("image.qoi")
-
+  data = decode("imgs/kodim10.qoi")
+  img = Image.fromarray(data, 'RGB')
+  img.show()
 
 if __name__ == "__main__":
   main()

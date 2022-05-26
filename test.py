@@ -17,12 +17,10 @@ class color:
     self.b = b
     self.a = a
 
-def hashPosition(color):
-  return (color.r * 3 + color.g * 5 + color.b * 7 + color.a * 11) % 64
+# pixels = np.uint8(np.zeros(10))
+# print(pixels[2:6])
 
-pixel = color(255, 255, 0, 255)
+test = np.array([1, 2, 3, 4, 5, 6])
+test2 = np.array([1, 2, 3, 4, 5, 6])
 
-hashPos = hashPosition(pixel)
-
-print(pixel = 
-  
+print((test == test2).all())
