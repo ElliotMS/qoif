@@ -104,7 +104,6 @@ def encode(img_path):
 
   seenPixels = np.full(64, color(0, 0, 0, 0)) # Zero initialized according to specifications
   prevPixel = color(0, 0, 0, 255) # Previous pixel starts as 0, 0, 0, 255 according to specifications
-  pixel = prevPixel
   maxSize = IMG_WIDTH * IMG_HEIGHT * (CHANNELS + 1) + QOI_HEADER_SIZE + QOI_END_MARKER_SIZE # Worst case encoding
   byteStream = np.uint8(np.zeros(maxSize)) # Create array with maxsize as np.uint8 is non mutable so .append() is invalid.
   run = 0
@@ -119,7 +118,6 @@ def encode(img_path):
   write8(byteStream, 1) # All channels linear
 
   for readIndex in range(0, len(imgData), CHANNELS):
-    prevPixel = pixel
 
     pixel = color(
       imgData[readIndex + 0],
@@ -138,6 +136,7 @@ def encode(img_path):
         byteStream[writeIndex] = QOI_OP_RUN | run-1 # Run is written with bias of -1 as run length can't be lower than 1 so run 0 is uneccecary. 
         writeIndex += 1
         run = 0
+        prevPixel = pixel
       continue
     elif run > 0:
       # If current pixel is not a run and we have an active run write immediatly.
@@ -151,6 +150,7 @@ def encode(img_path):
       # If current pixel has been seen previously write as QOI_OP_INDEX.
       byteStream[writeIndex] = QOI_OP_INDEX | hashPos
       writeIndex += 1
+      prevPixel = pixel
       continue
     else:
       # Add pixel to previously seen pixels.
@@ -164,6 +164,7 @@ def encode(img_path):
         # If difference for RGB channels are in range -2 <= x <= 1 write as QOI_OP_DIFF
         byteStream[writeIndex] = QOI_OP_DIFF | (diff.r + 2) << 4 | (diff.g + 2) << 2 | (diff.b + 2) << 0 # Written with bias of 2 to avoid negative int
         writeIndex += 1
+        prevPixel = pixel
         continue
       if -32 <= diff.g <= 31:
         # If difference in green channel is in range -32 <= x <= 31 calculate (dr-dg) and (db-dg)
@@ -173,6 +174,7 @@ def encode(img_path):
           # If difference in (dr-dg) and (db-dg) is in range -8 <= x <= 7 write as QOI_OP_LUMA
           byteStream[writeIndex:writeIndex+2] = [QOI_OP_LUMA | (diff.g + 32), (dr_dg + 8) << 4| (db_dg + 8) << 0] # Written with bias of 32 for diff.g and 8 for dr_dg and db_dg to avoid negative int
           writeIndex += 2
+          prevPixel = pixel
           continue
 
     # Full RGB(A) operation
@@ -180,10 +182,12 @@ def encode(img_path):
     if CHANNELS == 3:
       byteStream[writeIndex:writeIndex+4] = [QOI_OP_RGB, pixel.r, pixel.g, pixel.b]
       writeIndex += 4
+      prevPixel = pixel
       continue
     elif CHANNELS == 4:
       byteStream[writeIndex:writeIndex+5] = [QOI_OP_RGBA, pixel.r, pixel.g, pixel.b, pixel.a]
       writeIndex += 5
+      prevPixel = pixel
       continue
 
   byteStream[writeIndex:writeIndex+8] = QOI_END_MARKER[0:8] # Write end marker
@@ -261,7 +265,7 @@ def decode(qoi_path):
       seenPixels[hashPosition(pixel)] = deepcopy(pixel) # Write copy of pixel object to seen pixels. Needs to be copy so color in seenpixels[] doesn't change in future loops. 
 
     writePixel(pixels, pixel, writeIndex, CHANNELS)
-    
+
   return pixels.reshape(IMG_HEIGHT, IMG_WIDTH, CHANNELS)
 
 def main():
