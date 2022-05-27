@@ -247,25 +247,25 @@ def decode(qoi_path):
         dr = ((byte & QOI_MASK_DR) >> 4) - 2 # XXxxXXXX > 000000xx
         dg = ((byte & QOI_MASK_DG) >> 2) - 2 # XXXXxxXX > 000000xx
         db = ((byte & QOI_MASK_DB) >> 0) - 2 # XXXXXXxx > 000000xx
-        pixel.r = (pixel.r + dr) & 0xff #                                                                 255         1          256         0xff        0
-        pixel.g = (pixel.g + dg) & 0xff # Use & 0xff to compensate for python not having unsigned ints. 11111111 + 00000001 = 1 00000000 & 11111111 = 00000000. Also works for 0 - 1 = 255.
-        pixel.b = (pixel.b + db) & 0xff # 
+        pixel.r = (pixel.r + dr) & 0xff      #                                                                 255         1          256         0xff        0
+        pixel.g = (pixel.g + dg) & 0xff      # Use & 0xff to compensate for python not having unsigned ints. 11111111 + 00000001 = 1 00000000 & 11111111 = 00000000. Also works for 0 - 1 = 255.
+        pixel.b = (pixel.b + db) & 0xff      # 
 
       elif byte & QOI_MASK_1 == QOI_OP_LUMA:
         byte2 = read8(qoi)
-        dg = (byte & QOI_MASK_2) - 32     # Reads last 6 bits. Reverse +32 bias set in encoding.
+        dg = (byte & QOI_MASK_2) - 32              # Reads last 6 bits. Reverse +32 bias set in encoding.
         dr_dg = ((byte2 & QOI_MASK_DRDG) >> 4) - 8 # XXXXxxxx > 0000xxxx. Reverse +8 bias set in encoding.
         db_dg = ((byte2 & QOI_MASK_DBDG) >> 0) - 8 # XXXXxxxx > 0000xxxx. Reverse +8 bias set in encoding.
-        pixel.r = (pixel.r + dg + dr_dg) & 0xff 
-        pixel.g = (pixel.g + dg)         & 0xff
-        pixel.b = (pixel.b + dg + db_dg) & 0xff
+        pixel.r = (pixel.r + dg + dr_dg) & 0xff    #                                                                  0          1            256         0xff       255 
+        pixel.g = (pixel.g + dg)         & 0xff    # Use & 0xff to compensate for python not having unsigned ints. 00000000 - 00000001 = ...1 1111111 & 11111111 = 11111111. Also works for 255 + 1 = 0.
+        pixel.b = (pixel.b + dg + db_dg) & 0xff    #
 
-    seenPixels[hashPosition(pixel)] = deepcopy(pixel)
+    seenPixels[hashPosition(pixel)] = deepcopy(pixel) # Write copy of pixel object to seen pixels. Needs to be copy so color in seenpixels[] doesn't change in future loops. 
     writePixel(pixels, pixel, writeIndex, CHANNELS)
-  return pixels.reshape(IMG_HEIGHT, IMG_WIDTH, CHANNELS)  
+  return pixels.reshape(IMG_HEIGHT, IMG_WIDTH, CHANNELS)
 
 def main():
-  img_path = 'imgs/dice.png'
+  img_path = 'imgs/wikipedia_008.png'
   qoi = encode(img_path)
   print(f'Encoded image size:   {len(qoi)/1000}kb')
   writeFile(qoi, "encodedImage.qoi")
