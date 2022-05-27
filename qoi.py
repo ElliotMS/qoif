@@ -258,20 +258,21 @@ def decode(qoi_path):
         pixel.g = (pixel.g + dg)         & 0xff    # Use & 0xff to compensate for python not having unsigned ints. 00000000 - 00000001 = ...1 1111111 & 11111111 = 11111111. Also works for 255 + 1 = 0.
         pixel.b = (pixel.b + dg + db_dg) & 0xff    #
 
-    seenPixels[hashPosition(pixel)] = deepcopy(pixel) # Write copy of pixel object to seen pixels. Needs to be copy so color in seenpixels[] doesn't change in future loops. 
+      seenPixels[hashPosition(pixel)] = deepcopy(pixel) # Write copy of pixel object to seen pixels. Needs to be copy so color in seenpixels[] doesn't change in future loops. 
+
     writePixel(pixels, pixel, writeIndex, CHANNELS)
+    
   return pixels.reshape(IMG_HEIGHT, IMG_WIDTH, CHANNELS)
 
 def main():
-  # CLI: py qoi.py -encode/-decode img-path
+  # CLI: py qoi.py -encode/-decode img_path
   cmds = [cmd for cmd in sys.argv[1:] if cmd.startswith("-")]
   args = [cmd for cmd in sys.argv[1:] if not cmd.startswith("-")]
   if "-encode" in cmds:
-    writeFile(encode(args[0]), "encodedImage.qoi")
+    writeFile(encode(args[0]), "encoded_image.qoi")
   elif "-decode" in cmds:
-    img = Image.fromarray(decode("encodedImage.qoi"))
-    img.save("decodedImage.png")
-    img.show()
+    img = Image.fromarray(decode(args[0]))
+    img.save("decoded_image.png")
   else:
     raise Exception("Command not recognized")
 
