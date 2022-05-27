@@ -101,7 +101,6 @@ def encode(img_path):
   IMG_HEIGHT = img.height
   CHANNELS = len(img.mode)
   imgData = np.uint8(img).flatten()
-  print(f'Raw image size:       {len(imgData)/1000}kb')
 
   seenPixels = np.full(64, color(0, 0, 0, 0)) # Zero initialized according to specifications
   prevPixel = color(0, 0, 0, 255) # Previous pixel starts as 0, 0, 0, 255 according to specifications
@@ -194,7 +193,6 @@ def encode(img_path):
 def decode(qoi_path):
   # Decode .qoi file at given path
   qoi = open(qoi_path, "rb").read()
-  img = Image.open("imgs/kodim23.png")
 
   global readIndex
   readIndex = 0
@@ -265,14 +263,17 @@ def decode(qoi_path):
   return pixels.reshape(IMG_HEIGHT, IMG_WIDTH, CHANNELS)
 
 def main():
-  img_path = 'imgs/wikipedia_008.png'
-  qoi = encode(img_path)
-  print(f'Encoded image size:   {len(qoi)/1000}kb')
-  writeFile(qoi, "encodedImage.qoi")
-  data = decode("encodedImage.qoi")
-  img = Image.fromarray(data)
-  img.save("decodedImage.png")
-  img.show()
+  # CLI: py qoi.py -encode/-decode img-path
+  cmds = [cmd for cmd in sys.argv[1:] if cmd.startswith("-")]
+  args = [cmd for cmd in sys.argv[1:] if not cmd.startswith("-")]
+  if "-encode" in cmds:
+    writeFile(encode(args[0]), "encodedImage.qoi")
+  elif "-decode" in cmds:
+    img = Image.fromarray(decode("encodedImage.qoi"))
+    img.save("decodedImage.png")
+    img.show()
+  else:
+    raise Exception("Command not recognized")
 
 if __name__ == "__main__":
   main()
