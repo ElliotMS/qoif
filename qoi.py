@@ -95,7 +95,7 @@ def writeFile(data, fileName):
   f.close()
 
 def encode(img_path):
-  # Encodes image at given path.
+ # Encodes image at given path.
   img = Image.open(img_path)
   IMG_WIDTH = img.width
   IMG_HEIGHT = img.height
@@ -127,7 +127,7 @@ def encode(img_path):
     )
     if CHANNELS == 4:
       pixel.a = imgData[readIndex + 3]
-    
+
     # Run-length operation
     if isEqual(prevPixel, pixel):
       run += 1
@@ -136,59 +136,60 @@ def encode(img_path):
         byteStream[writeIndex] = QOI_OP_RUN | run-1 # Run is written with bias of -1 as run length can't be lower than 1 so run 0 is uneccecary. 
         writeIndex += 1
         run = 0
-        prevPixel = pixel
-      continue
-    elif run > 0:
-      # If current pixel is not a run and we have an active run write immediatly.
-      byteStream[writeIndex] = QOI_OP_RUN | run-1 # Run is written with bias of -1 as run length can't be lower than 1 so run 0 is uneccecary. 
-      writeIndex += 1
-      run = 0
+        # --> end of loop
 
-    # Index operation
-    hashPos = hashPosition(pixel)
-    if isEqual(pixel, seenPixels[hashPos]):
-      # If current pixel has been seen previously write as QOI_OP_INDEX.
-      byteStream[writeIndex] = QOI_OP_INDEX | hashPos
-      writeIndex += 1
-      prevPixel = pixel
-      continue
     else:
-      # Add pixel to previously seen pixels.
-      seenPixels[hashPos] = pixel
 
-    # Difference operation & Luma difference operation
-    diff = difference(pixel, prevPixel)
-    if diff.a == 0:
-      # Can only preform QOI_OP_DIFF or QOI_OP_LUMA if difference in alpha values is 0.
-      if -2 <= diff.r <= 1 and -2 <= diff.g <= 1 and -2 <= diff.b <= 1:
-        # If difference for RGB channels are in range -2 <= x <= 1 write as QOI_OP_DIFF
-        byteStream[writeIndex] = QOI_OP_DIFF | (diff.r + 2) << 4 | (diff.g + 2) << 2 | (diff.b + 2) << 0 # Written with bias of 2 to avoid negative int
+      if run > 0:
+        # If current pixel is not a run and we have an active run write immediatly.
+        byteStream[writeIndex] = QOI_OP_RUN | run-1 # Run is written with bias of -1 as run length can't be lower than 1 so run 0 is uneccecary. 
         writeIndex += 1
-        prevPixel = pixel
-        continue
-      if -32 <= diff.g <= 31:
-        # If difference in green channel is in range -32 <= x <= 31 calculate (dr-dg) and (db-dg)
-        dr_dg = diff.r - diff.g
-        db_dg = diff.b - diff.g
-        if -8 <= dr_dg <= 7 and -8 <= db_dg <= 7:
-          # If difference in (dr-dg) and (db-dg) is in range -8 <= x <= 7 write as QOI_OP_LUMA
-          byteStream[writeIndex:writeIndex+2] = [QOI_OP_LUMA | (diff.g + 32), (dr_dg + 8) << 4| (db_dg + 8) << 0] # Written with bias of 32 for diff.g and 8 for dr_dg and db_dg to avoid negative int
-          writeIndex += 2
-          prevPixel = pixel
-          continue
+        run = 0
 
-    # Full RGB(A) operation
-    # If no other operation is valid write as RGB or RGBA
-    if CHANNELS == 3:
-      byteStream[writeIndex:writeIndex+4] = [QOI_OP_RGB, pixel.r, pixel.g, pixel.b]
-      writeIndex += 4
-      prevPixel = pixel
-      continue
-    elif CHANNELS == 4:
-      byteStream[writeIndex:writeIndex+5] = [QOI_OP_RGBA, pixel.r, pixel.g, pixel.b, pixel.a]
-      writeIndex += 5
-      prevPixel = pixel
-      continue
+      hashPos = hashPosition(pixel)
+
+      # Index operation
+      if isEqual(pixel, seenPixels[hashPos]):
+        # If current pixel has been seen previously write as QOI_OP_INDEX.
+        byteStream[writeIndex] = QOI_OP_INDEX | hashPos
+        writeIndex += 1
+        # --> end of loop
+      else:
+        # Add pixel to previously seen pixels.
+        seenPixels[hashPos] = pixel
+
+        # Difference operation & Luma difference operation
+        diff = difference(pixel, prevPixel)
+        if diff.a == 0:
+          # Can only preform QOI_OP_DIFF or QOI_OP_LUMA if difference in alpha values is 0.
+          if -2 <= diff.r <= 1 and -2 <= diff.g <= 1 and -2 <= diff.b <= 1:
+            # If difference for RGB channels are in range -2 <= x <= 1 write as QOI_OP_DIFF
+            byteStream[writeIndex] = QOI_OP_DIFF | (diff.r + 2) << 4 | (diff.g + 2) << 2 | (diff.b + 2) << 0 # Written with bias of 2 to avoid negative int
+            writeIndex += 1
+            # --> end of loop
+
+          elif -32 <= diff.g <= 31 and -8 <= (diff.r - diff.g) <= 7 and -8 <= (diff.b - diff.g) <= 7:
+            # If difference in green channel is in range -32 <= x <= 31 calculate (dr-dg) and (db-dg)             # If difference in (dr-dg) and (db-dg) is in range -8 <= x <= 7 write as QOI_OP_LUMA
+            dr_dg = diff.r - diff.g
+            db_dg = diff.b - diff.g
+            byteStream[writeIndex:writeIndex+2] = [QOI_OP_LUMA | (diff.g + 32), (dr_dg + 8) << 4| (db_dg + 8) << 0] # Written with bias of 32 for diff.g and 8 for dr_dg and db_dg to avoid negative int
+            writeIndex += 2
+            # --> end of loop
+
+          # Full RGB operation
+          else:
+            # We know the difference in alpha channel is 0 so we can encode as RGB
+            byteStream[writeIndex:writeIndex+4] = [QOI_OP_RGB, pixel.r, pixel.g, pixel.b]
+            writeIndex += 4
+            # --> end of loop
+        
+        # Full RGBA operation
+        else:
+            byteStream[writeIndex:writeIndex+5] = [QOI_OP_RGBA, pixel.r, pixel.g, pixel.b, pixel.a]
+            writeIndex += 5
+            # --> end of loop
+    
+    prevPixel = pixel
 
   byteStream[writeIndex:writeIndex+8] = QOI_END_MARKER[0:8] # Write end marker
   writeIndex += 8
