@@ -132,7 +132,7 @@ def encode(img_path):
     if isEqual(prevPixel, pixel):
       run += 1
       if run == 62 or readIndex == len(imgData) - CHANNELS:
-        # If run is max size (62 as b111110 and b111111 are occupied by QOI_OP_RGB and QOI_OP_RGBA) or pixel is last pixel write immediatly.
+        # If run is max size (62 as 11111110 and 11111111 are occupied by QOI_OP_RGB and QOI_OP_RGBA) or pixel is last pixel write immediatly.
         byteStream[writeIndex] = QOI_OP_RUN | run-1 # Run is written with bias of -1 as run length can't be lower than 1 so run 0 is uneccecary. 
         writeIndex += 1
         run = 0
@@ -169,7 +169,7 @@ def encode(img_path):
             # --> end of loop
 
           elif -32 <= diff.g <= 31 and -8 <= (diff.r - diff.g) <= 7 and -8 <= (diff.b - diff.g) <= 7:
-            # If difference in green channel is in range -32 <= x <= 31 calculate (dr-dg) and (db-dg)             # If difference in (dr-dg) and (db-dg) is in range -8 <= x <= 7 write as QOI_OP_LUMA
+            # If difference in green channel is in range -32 <= x <= 31 and difference in (dr-dg) and (db-dg) is in range -8 <= x <= 7 write as QOI_OP_LUMA
             dr_dg = diff.r - diff.g
             db_dg = diff.b - diff.g
             byteStream[writeIndex:writeIndex+2] = [QOI_OP_LUMA | (diff.g + 32), (dr_dg + 8) << 4| (db_dg + 8) << 0] # Written with bias of 32 for diff.g and 8 for dr_dg and db_dg to avoid negative int
