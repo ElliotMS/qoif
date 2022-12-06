@@ -6,7 +6,7 @@ Simple implementation of the [Quite OK Image format](https://qoiformat.org/) Pyt
 ## Requirements
 * Python 3.10.2+
 * [NumPy](https://numpy.org/)
-* [Pillow image library](https://pillow.readthedocs.io/en/stable/)
+* [Pillow](https://pillow.readthedocs.io/en/stable/)
 
 ## Usage
 
