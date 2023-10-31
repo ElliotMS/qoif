@@ -1,5 +1,5 @@
 # QOIF
-Simple implementation of the [Quite OK Image format](https://qoiformat.org/) Python 3.10.2.
+Simple implementation of the [Quite OK Image format](https://qoiformat.org/) in Python 3.10.2.
 
 "QOI is fast. It losslessy compresses images to a similar size of PNG, while offering 20x-50x faster encoding and 3x-4x faster decoding."
 
